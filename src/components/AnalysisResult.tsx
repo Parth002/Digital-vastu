@@ -1,38 +1,13 @@
+// File: src/components/AnalysisResult.tsx
 
+// 1. IMPORT THE FONT DATA and jsPDF type
 import React, { useRef, useState } from 'react';
 import { type VastuReport, type VastuDosha } from '../types';
 import { useTranslation } from '../hooks/useTranslation';
+import { hindRegularBase64 } from '../assets/fonts'; // <-- ADD THIS IMPORT
+import { jsPDF } from 'jspdf'; // <-- CHANGE THIS IMPORT if you have it, or add it.
 
-
-const DoshaCard: React.FC<{ dosha: VastuDosha, index: number }> = ({ dosha, index }) => {
-    const { t } = useTranslation();
-    return (
-        <div className="bg-white rounded-xl shadow-md border border-gray-200 overflow-hidden break-inside-avoid mb-6">
-            <div className="p-6">
-                <h4 className="text-xl font-bold font-serif text-teal-800 mb-2">{t('result_dosha_card_title', { index: index + 1 })}: {dosha.location}</h4>
-                <div className="space-y-4">
-                    <div>
-                        <h5 className="font-semibold text-gray-700">{t('result_dosha_problem')}</h5>
-                        <p className="text-gray-600">{dosha.problem}</p>
-                    </div>
-                    <div>
-                        <h5 className="font-semibold text-gray-700">{t('result_dosha_impact')}</h5>
-                        <p className="text-gray-600">{dosha.impact}</p>
-                    </div>
-                    <div className="bg-teal-50/70 p-4 rounded-lg border border-teal-200">
-                        <h5 className="font-semibold text-teal-900">{t('result_dosha_remedy')}</h5>
-                        <p className="text-teal-800 mb-2">{dosha.remedy.description}</p>
-                        {dosha.remedy.items.length > 0 && (
-                            <ul className="list-disc list-inside text-sm text-teal-700">
-                                {dosha.remedy.items.map((item, i) => <li key={i}>{item}</li>)}
-                            </ul>
-                        )}
-                    </div>
-                </div>
-            </div>
-        </div>
-    );
-}
+// ... (DoshaCard component remains the same) ...
 
 interface AnalysisResultProps {
   report: VastuReport;
@@ -40,42 +15,70 @@ interface AnalysisResultProps {
 }
 
 const AnalysisResult: React.FC<AnalysisResultProps> = ({ report, onReset }) => {
-  const { t } = useTranslation();
+  const { t, language } = useTranslation(); // <-- ADD `language` here
   const summaryRef = useRef<HTMLDivElement>(null);
   const doshasContainerRef = useRef<HTMLDivElement>(null);
   const [isDownloading, setIsDownloading] = useState(false);
 
+  // 2. REPLACE THE ENTIRE handleDownloadPdf FUNCTION WITH THIS NEW VERSION
   const handleDownloadPdf = async () => {
-    if (isDownloading || !window.jspdf || !window.html2canvas) {
+    if (isDownloading || !window.html2canvas) {
         return;
     }
     setIsDownloading(true);
 
     try {
-        const { jsPDF } = window.jspdf;
         const pdf = new jsPDF({ orientation: 'p', unit: 'mm', format: 'a4' });
-        const contentWidth = pdf.internal.pageSize.getWidth() - 20; // 10mm margin on each side
+        
+        // --- Font Embedding Logic ---
+        // Only embed the font if the language is Hindi
+        if (language === 'hi') {
+          // Add the font file to the virtual file system
+          pdf.addFileToVFS('Hind-Regular.ttf', hindRegularBase64);
+          // Add the font to jsPDF
+          pdf.addFont('Hind-Regular.ttf', 'Hind', 'normal');
+          // Set the font for the document
+          pdf.setFont('Hind');
+        }
+        // --- End of Font Logic ---
 
-        const addCanvasToPdfPage = (canvas: HTMLCanvasElement, pdfInstance: any) => {
+        const contentWidth = pdf.internal.pageSize.getWidth() - 20; // 10mm margin
+        let yPos = 15; // Initial Y position for content
+
+        // Add a title to the PDF
+        pdf.setFontSize(22);
+        pdf.text(t('result_title'), 10, yPos);
+        yPos += 15;
+
+        const addCanvasToPdfPage = (canvas: HTMLCanvasElement, pdfInstance: jsPDF, startY: number) => {
             const imgData = canvas.toDataURL('image/png');
             const imgProps = pdfInstance.getImageProperties(imgData);
             const imgHeight = (imgProps.height * contentWidth) / imgProps.width;
-            pdfInstance.addImage(imgData, 'PNG', 10, 10, contentWidth, imgHeight);
+            
+            // Check if there is enough space on the current page
+            if (startY + imgHeight > pdfInstance.internal.pageSize.getHeight() - 10) {
+              pdfInstance.addPage();
+              startY = 15; // Reset Y position on new page
+            }
+
+            pdfInstance.addImage(imgData, 'PNG', 10, startY, contentWidth, imgHeight);
+            return startY + imgHeight;
         };
 
         // 1. Capture and add summary page
         if (summaryRef.current) {
-            const canvas = await window.html2canvas(summaryRef.current, { scale: 2, useCORS: true, backgroundColor: '#f8fafc' });
-            addCanvasToPdfPage(canvas, pdf);
+            const canvas = await window.html2canvas(summaryRef.current, { scale: 2, useCORS: true, backgroundColor: '#ffffff' });
+            yPos = addCanvasToPdfPage(canvas, pdf, yPos);
         }
 
-        // 2. Capture and add a new page for each dosha
+        // 2. Capture and add each dosha
         const doshaNodes = doshasContainerRef.current?.children;
         if (doshaNodes) {
             for (const node of Array.from(doshaNodes)) {
-                const canvas = await window.html2canvas(node as HTMLElement, { scale: 2, useCORS: true, backgroundColor: '#f8fafc' });
+                const canvas = await window.html2canvas(node as HTMLElement, { scale: 2, useCORS: true, backgroundColor: '#ffffff' });
+                // Each dosha gets its own new page for better formatting
                 pdf.addPage();
-                addCanvasToPdfPage(canvas, pdf);
+                addCanvasToPdfPage(canvas, pdf, 15); 
             }
         }
 
@@ -90,10 +93,13 @@ const AnalysisResult: React.FC<AnalysisResultProps> = ({ report, onReset }) => {
 
 
   return (
+    // ... (The rest of your component's JSX remains the same, but ensure the refs are attached correctly)
     <div className="max-w-4xl mx-auto relative">
         <div id="report-content">
-            <div ref={summaryRef} className="p-4 sm:p-6 md:p-8">
+            {/* Make sure the ref is attached to the parent div of the summary */}
+            <div ref={summaryRef}> 
                 <div className="text-center mb-10">
+                    {/* This title is what will appear on the webpage, not the PDF title */}
                     <h2 className="text-4xl md:text-5xl font-bold font-serif text-gray-900">{t('result_title')}</h2>
                     <p className="text-lg text-gray-600 mt-2">{t('result_subtitle')}</p>
                 </div>
