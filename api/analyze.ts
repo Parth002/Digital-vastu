@@ -1,25 +1,27 @@
 // File: /api/analyze.ts
 
-import { GoogleGenAI, HarmCategory, HarmBlockThreshold } from "@google/genai";
+import { GoogleGenAI } from "@google/genai";
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 
-// IMPORTANT: Do NOT hardcode the API key here.
-// We will set this in the Vercel project settings.
+// This line should be the only source for your API key.
+// It reads the key you set in the Vercel dashboard.
 const API_KEY = process.env.GEMINI_API_KEY;
 
 if (!API_KEY) {
+  // This will cause the function to fail gracefully if the key is missing.
   throw new Error("GEMINI_API_KEY environment variable not set");
 }
 
-// Configure the AI model
+// --- CORRECTED INITIALIZATION ---
+// Pass the API key within an object.
 const genAI = new GoogleGenAI(API_KEY);
 const model = genAI.getGenerativeModel({
   model: "gemini-1.5-flash",
 });
+// --- END OF CORRECTION ---
 
-// Main function to handle requests
+// The rest of the function remains the same.
 export default async function handler(req: VercelRequest, res: VercelResponse) {
-  // Ensure this is a POST request
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method Not Allowed' });
   }
@@ -61,14 +63,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     `;
 
     const result = await model.generateContent([prompt, imagePart]);
-    const jsonText = result.response.text();
-    const reportData = JSON.parse(jsonText);
+    const responseText = result.response.text();
+    const reportData = JSON.parse(responseText);
 
     if (!reportData.is_floor_plan) {
         return res.status(400).json({ error: reportData.error || `The uploaded file does not appear to be a ${propertyType} floor plan.` });
     }
 
-    // Send the successful analysis back to the client
     res.status(200).json(reportData);
 
   } catch (error) {
