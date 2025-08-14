@@ -22,3 +22,12 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Environment variables - IMPORTANT!
+.env
+.env.local
+.env.*.local
+
+# IDE and OS files
+.DS_Store
+.vscode/
