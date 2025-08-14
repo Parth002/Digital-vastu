@@ -1,0 +1,6 @@
+{
+  "name": "Digital Vastu AI",
+  "description": "An AI-powered Vastu analysis tool that provides expert-verified reports to harmonize your living space. Based on the 'Human-in-the-Loop' model, we combine the speed of AI with the wisdom of certified Vastu experts.",
+  "requestFramePermissions": [],
+  "prompt": ""
+}
