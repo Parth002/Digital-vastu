@@ -8,5 +8,11 @@ export default defineConfig({
     alias: {
       '@': path.resolve(__dirname, '.'),
     }
-  }
+  },
+  // ADD THIS BUILD SECTION
+  build: {
+    rollupOptions: {
+      external: ['jspdf'], // Tells Vite to ignore 'jspdf' during the build
+    },
+  },
 });
